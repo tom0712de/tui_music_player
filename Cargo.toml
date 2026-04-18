@@ -1,0 +1,13 @@
+[package]
+name = "Music"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlite = "0.37.0"
+tui = "0.19"
+crossterm = "0.25"
+ratatui = "0.30.0"
+log = "0.4.29"
+log4rs = "1.4.0"
+anyhow = "1.0.102"
