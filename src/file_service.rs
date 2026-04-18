@@ -3,7 +3,7 @@ use::std::path::Path;
 pub use crate::db_service;
 
 // get Files from Folder and add new music to db
-pub fn update_songs(p_movie_path: &Path) ->Result<(Vec<i64>),std::io::Error> {
+pub fn update_songs(p_movie_path: &Path) ->Result<(Vec<i64>),anyhow::Error> {
     let mut songs = Vec::new();
     let movie_path = p_movie_path;
     for entry in match fs::read_dir(movie_path){

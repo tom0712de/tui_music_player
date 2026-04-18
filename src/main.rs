@@ -28,7 +28,7 @@ db_service::get_song_count();
 let mut app = tui_service::App::new(tui_service::Parent::default).unwrap();
 match app.run(&mut ratatui::DefaultTerminal::new(CrosstermBackend::new(stdout())).unwrap()){
     Ok(())=> (),
-    Err(e) => eprintln!("Error: '{e}'") //file.write_all(format!("Error in Main: '{}'",e).as_bytes()).expect(""), 
+    Err(e) => panic!("Error: '{e}'") //file.write_all(format!("Error in Main: '{}'",e).as_bytes()).expect(""), 
 };
 
 }

@@ -1,4 +1,5 @@
 use::sqlite::Connection;
+use::anyhow::anyhow;
 use::std::io::Error;
 use::std::io::ErrorKind;
 
@@ -17,16 +18,13 @@ pub struct Playlist{
     pub list_name: String,
 }
 //Function is used in this module only 
-pub fn get_connection() -> Result<Connection, Error>{
-    let songs = match sqlite::open("../music_player_DB.sqlite"){
-        Ok(t) => t,
-        Err(_e) => return Err(std::io::Error::new(ErrorKind::Other, "failed to establish Connection to Database")) , 
-    };
-    return Ok(songs);
+pub fn get_connection() -> Result<Connection, anyhow::Error>{
+    let songs = sqlite::open("../music_player_DB.sqlite")?;
+    return Ok(songs)
 
 }
 
-pub fn init() -> Result<(), Error>{
+pub fn init() -> Result<(), anyhow::Error>{
     let songs = get_connection()?;
     let query = "Create Table IF NOT EXISTS songs(
         song_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,7 +55,7 @@ pub fn init() -> Result<(), Error>{
     
 
 
-pub fn add_song(song:&Song) -> Result<(), Error>{
+pub fn add_song(song:&Song) -> Result<(), anyhow::Error>{
     let db = get_connection()?;
     let query = format!("INSERT INTO songs(song_name, path) VALUES ('{}','{}');",song.song_name,song.path);
     let _ = match db.execute(&query){
@@ -67,7 +65,7 @@ pub fn add_song(song:&Song) -> Result<(), Error>{
     Ok(())
 }
 
-pub fn add_song_to_playlist(song_id: i64, list_id:i64, playlist_pos: Option<i64>) -> Result<(), Error>{
+pub fn add_song_to_playlist(song_id: i64, list_id:i64, playlist_pos: Option<i64>) -> Result<(), anyhow::Error>{
     
 
     let db = get_connection()?;
@@ -76,15 +74,12 @@ pub fn add_song_to_playlist(song_id: i64, list_id:i64, playlist_pos: Option<i64>
         None => format!("INSERT INTO song_playlist_junction(song_id,playlist_id) VALUES ('{}','{}');",song_id,list_id),
 
     };
-    match db.execute(&query){
-        Ok(_t) => (),
-        Err(e) => return Err(Error::new(ErrorKind::Other,"Error in db_service: Line 81 '{e}'")),
-    };
+    db.execute(&query)?;
     Ok(())
 }
 
 
-pub fn get_song_info(index:&i64) -> Result<Song, std::io::Error> {
+pub fn get_song_info(index:&i64) -> Result<Song, anyhow::Error> {
 
     let db = get_connection()?;
     let mut song = Song{
@@ -92,10 +87,7 @@ pub fn get_song_info(index:&i64) -> Result<Song, std::io::Error> {
         song_name: String::from("default"),
         path: String::from(""),
     };
-    let mut stmt = match db.prepare(format!("SELECT * FROM songs WHERE song_id='{}';",&index)){
-        Ok(t) => t,
-        Err(e) => return Err(Error::new(ErrorKind::Other,"Error in db_service: Line 97 '{e}'")),
-    }; //-> Returns <Statement>
+    let mut stmt = db.prepare(format!("SELECT * FROM songs WHERE song_id='{}';",&index))?;
                                                                                                                                 //
     while State::Row == stmt.next().expect(""){ // a statement has mult State(all returned rows) if
                                                 // they can be iterated with if Stat::done all rows
@@ -104,7 +96,7 @@ pub fn get_song_info(index:&i64) -> Result<Song, std::io::Error> {
     Ok(song)
 
 }
-pub fn get_song_by_name(song_name: &str) -> Result<Song, Error>{
+pub fn get_song_by_name(song_name: &str) -> Result<Song, anyhow::Error>{
    let db = get_connection()?;
    let mut song = Song{
         song_id: 0,  
@@ -122,7 +114,7 @@ pub fn get_song_by_name(song_name: &str) -> Result<Song, Error>{
 
 }
 // helper functions
-pub fn is_path_unique(song_path:&str) -> Result<bool,Error>{
+pub fn is_path_unique(song_path:&str) -> Result<bool,anyhow::Error>{
 
     let db = get_connection()?;
     let mut stmt = db.prepare(format!("SELECT * FROM songs WHERE path='{}';",song_path)).expect("failed to query");
@@ -130,7 +122,7 @@ pub fn is_path_unique(song_path:&str) -> Result<bool,Error>{
 }
 
 
-pub fn get_song_count() -> Result<i64, Error>{
+pub fn get_song_count() -> Result<i64, anyhow::Error>{
 
     let db = get_connection()?;
     let mut stmt = db.prepare(format!("SELECT COUNT(*) FROM songs;")).expect("failed to query"); 
@@ -138,22 +130,19 @@ pub fn get_song_count() -> Result<i64, Error>{
     Ok(stmt.read(0).unwrap())
 
 }
-pub fn is_playlist_unique(playlist_name: &str) -> Result<bool,Error>{
+pub fn is_playlist_unique(playlist_name: &str) -> Result<bool,anyhow::Error>{
     let db = get_connection()?;
     let mut stmt = db.prepare(format!("SELECT * FROM playlist WHERE list_name='{}';",playlist_name)).expect("failed to query");
     Ok(State::Row !=  stmt.next().expect(""))
 }
-pub fn add_playlist(playlist: Playlist) -> Result<(), Error>{
+pub fn add_playlist(playlist: Playlist) -> Result<(), anyhow::Error>{
     let db = get_connection()?;
     let query = format!("INSERT INTO playlist (list_name) VALUES ('{}');",playlist.list_name);
     println!("query:{}",query);
-    let _ = match db.execute(&query){
-        Ok(t) => t,
-        Err(e) => return Err(Error::new(ErrorKind::Other,"Error in db_service: line 152 '{e}' ")),
-    };
+    db.execute(&query)?;
     Ok(())
 }
-pub fn get_all_playlist() -> Result<Vec<Playlist>, Error>{
+pub fn get_all_playlist() -> Result<Vec<Playlist>, anyhow::Error>{
     let db = get_connection()?;
     let mut stmt = db.prepare(format!("SELECT * FROM playlist")).expect("failed to query");
     let mut v = Vec::new();
@@ -167,15 +156,12 @@ pub fn get_all_playlist() -> Result<Vec<Playlist>, Error>{
     Ok(v)
 }
 
-pub fn get_playlist_by_name(list_name :&str) -> Result<Playlist,Error>{
+pub fn get_playlist_by_name(list_name :&str) -> Result<Playlist,anyhow::Error>{
     let db = get_connection()?;
-    let mut stmt = match db.prepare(format!("SELECT * FROM playlist WHERE list_name='{}';", list_name)){
-        Ok(t) => t,
-        Err(e) => return Err(Error::new(ErrorKind::Other,"Error in db_service: line 174 '{e}'")),
-    };
+    let mut stmt = db.prepare(format!("SELECT * FROM playlist WHERE list_name='{}';", list_name))?;
     match stmt.next().unwrap(){
         
-        State::Done => return Err(Error::new(ErrorKind::NotFound,format!("Playlist by name '{}' not found",list_name))),
+        State::Done => return Err(anyhow!("Error in db_service line: 163 -> playlist by name '{list_name}' not found")),
 
         State::Row=>{
             let playlist = Playlist{
@@ -186,12 +172,12 @@ pub fn get_playlist_by_name(list_name :&str) -> Result<Playlist,Error>{
         }
     }
 }
-pub fn get_songs_from_playlist(p_playlist_name: &str) -> Result<Vec<Song>,Error>{
+pub fn get_songs_from_playlist(p_playlist_name: &str) -> Result<Vec<Song>,anyhow::Error>{
     let db = get_connection()?;
     let playlist = get_playlist_by_name(p_playlist_name)?;
     let mut stmt = match db.prepare(format!("SELCET * FROM song_playlist_junction WHERE playlist_id = '{}';",playlist.list_id)){
         Ok(t) => t,
-        Err(e) => return Err(Error::new(ErrorKind::Other,"Error in db_service.rs: line 194 '{e}'")),
+        Err(e) => return Err(anyhow!("Error in db_service.rs: line 194 '{e}'")),
     };
     let mut songs = Vec::new();
     while State::Row == stmt.next().expect("possible Error"){

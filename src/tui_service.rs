@@ -1,4 +1,5 @@
 use::std::io;
+use::anyhow::anyhow;
 use::std::io::ErrorKind;
 pub use crate::db_service;
 use::ratatui::{DefaultTerminal, Frame};
@@ -11,7 +12,7 @@ pub struct App{
     pub song_list: Song_List,
 }
 impl App {
-    pub fn new(p_parent: Parent) -> Result<Self,std::io::Error>{
+    pub fn new(p_parent: Parent) -> Result<Self,anyhow::Error>{
       Ok(Self{
         is_exit : false,
         song_list : Song_List::new(p_parent)?,
@@ -22,7 +23,7 @@ impl App {
 
     // Basiclly main methode 
     // hauptsächlich ratatui boilerplate
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<(), std::io::Error> {    
+    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<(), anyhow::Error> {    
         terminal.clear();
         crossterm::terminal::enable_raw_mode()?;
         // main loop renderd frame und checkt keyEvent
@@ -34,7 +35,9 @@ impl App {
             match crossterm::event::read()?{
                 Event::Key(e) => match self.handle_key_press(e){
                     Ok(_t) => (),
-                    Err(_e) => self.is_exit = true,
+                    Err(e) => {
+                        println!("{e}");
+                        self.is_exit = true},
             
                 },
                 _ => (),
@@ -83,15 +86,14 @@ impl App {
         //---- Outer Block
         let outer_block = Block::bordered().title("Music Player");
         frame.render_widget(outer_block, frame.area());
-        
-//        std::thread::sleep(std::time::Duration::from_secs(3));
+
     }
 
 
 
     
 
-    pub fn handle_key_press(&mut self,key_event: KeyEvent) -> Result<(), std::io::Error>{
+    pub fn handle_key_press(&mut self,key_event: KeyEvent) -> Result<(), anyhow::Error>{
         match key_event.code{
             KeyCode::Char('q') => self.is_exit = true,
             KeyCode::Char('j') => self.song_list.table_state.select_next(),
@@ -99,7 +101,7 @@ impl App {
             KeyCode::Char('e') => { 
                 let r = match self.song_list.table_state.selected(){
                     Some(t) => t,
-                    None => return Err (std::io::Error::new(ErrorKind::Other, "failed to read selected row")),
+                    None => return Err (anyhow!("Error in db::db_service::handle_key_press, can not acces Elemtent ")),
                 };
                 let name = &self.song_list.rows[r][0];
                 let parent = Parent::playlist_name(db_service::get_playlist_by_name(name)?.list_name);
@@ -126,7 +128,7 @@ pub struct Song_List{
     pub table_state: TableState, 
 }
 impl Song_List{
-    pub fn new(parent:Parent) -> Result<Self,std::io::Error>{
+    pub fn new(parent:Parent) -> Result<Self,anyhow::Error>{
         match parent{
             Parent::default =>{
                 let v_playlists = db_service::get_all_playlist()?;
