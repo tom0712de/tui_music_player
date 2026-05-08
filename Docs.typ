@@ -27,8 +27,17 @@ edge(<Files>,<MusicPlayer>,"->",[Play],bend: 20deg)
 
 
 )
+== How should the player be controlled?
+- Move  jk $arrow$ up down
+- Enter to play
+- e move into dia 
+- q move into parent dir 
+=== Playback controls
+- space $arrow$ play pause
+- hl $arrow$ skip song
+- arrow keys to skip inside song
+- Seperat editing mode $arrow$ maybe i to acces
 
 
-==
 
 
