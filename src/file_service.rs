@@ -41,7 +41,7 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
             let list_id = db_service::get_playlist_by_name(&playlist_name)?.list_id;
             for val in update_songs(&p_path).expect("Here"){
                 if !db_service::is_song_in_playlist(&val,&list_id)?{
-                    db_service::add_song_to_playlist(val,list_id, None)? 
+                    db_service::add_song_to_playlist(val,list_id, None)?;
                 }
             }
         }
@@ -68,8 +68,8 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
             if db_service::is_path_unique(&song.path)?{
                 db_service::add_song(&song)?;
             }
-            let re_song = db_service::get_song_by_name(&song.song_name)?;
-            songs.push(re_song.song_id)
+            let re_song = db_service::get_song_by_path(&song.path).expect("Found_error");
+            songs.push(re_song.song_id);
 
             }
                 

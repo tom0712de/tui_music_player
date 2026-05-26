@@ -9,6 +9,7 @@ pub mod db_service;
 pub mod file_service;
 pub mod tui_service;
 pub mod sound_service;
+pub mod editor;
 fn main() {
 let _file = OpenOptions::new()
         .create(true)
@@ -19,7 +20,7 @@ let _file = OpenOptions::new()
 
 
 //let musik_path = Path::new("/home/tom/Musik");//debug
-let musik_path = Path::new("/media/tom/HDD/music"); //prod
+let musik_path = Path::new("/mnt/HDD/music"); //prod
 match db_service::init(){
     Ok(()) => (),
     Err(e) => eprintln!("'Error while trying to call db_service::init in main: '{e}'")

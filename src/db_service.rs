@@ -43,11 +43,9 @@ pub fn init() -> Result<(), anyhow::Error>{
     id INTEGER PRIMARY KEY,
     song_id INTEGER NOT NULL,
     playlist_id INTEGER NOT NULL,
-    playlist_pos INTEGER,
-    UNIQUE(playlist_id, playlist_pos)
-);";
+    playlist_pos INTEGER);";
 
-   songs.execute(query)?;
+   songs.execute(query).expect("can not create junction");
     Ok(())    
     }
     
@@ -65,7 +63,102 @@ pub fn add_song(song:&Song) -> Result<(), anyhow::Error>{ //needs sql injec proo
 //    let query = format!("INSERT INTO songs(song_name, path) VALUES ('{}','{}');",song.song_name,song.path);
     Ok(())
 }
+pub fn update_song(song: &Song) -> Result<(), anyhow::Error>{
+    let db = get_connection()?;
+    let mut stmt = db.prepare("
+        UPDATE songs
+        SET Song_name = :song_name
 
+        WHERE song_id = :song_id ;
+        ")?;
+    stmt.bind((":song_name",song.song_name.as_str()))?;
+    stmt.bind((":song_id",song.song_id))?;
+    stmt.next()?;
+    Ok(())
+
+}
+pub fn update_playlist(playlist: &Playlist) -> Result<(),anyhow::Error>{
+    let db = get_connection()?;
+    let mut stmt = db.prepare("
+        UPDATE playlist
+        SET list_name = :list_name
+        WHERE list_id = :list_id
+        ")?;
+    stmt.bind((":list_name",playlist.list_name.as_str()))?;
+    stmt.bind((":list_id",playlist.list_id))?;
+    stmt.next()?;
+    Ok(())
+}
+pub fn mov_song_up(song: &Song,playlist_id: i64,increment: i64) -> Result<(),anyhow::Error>{
+    let pos = get_song_pos(song.song_id)?;
+    let db = get_connection()?;
+    let new_pos = pos + increment;
+    eprintln!("new pos {}",new_pos);
+    if is_song_at_pos(new_pos,playlist_id)? && new_pos > 0{
+        let mut mov_down = db.prepare("
+            UPDATE song_playlist_junction
+            SET playlist_pos = :pos
+            WHERE playlist_id = :playlist_id AND playlist_pos =:pos_new;
+            ")?;
+        let mut mov_up= db.prepare("
+            Update song_playlist_junction
+            Set playlist_pos = :new_pos
+            Where song_id = :song_id;
+        ").expect("Error in sql statement");
+
+        mov_up.bind((":new_pos",new_pos)).expect("check1");
+        mov_up.bind((":song_id",song.song_id))?;
+
+
+        mov_down.bind((":playlist_id",playlist_id))?;
+        mov_down.bind((":pos_new",new_pos))?;
+        mov_down.bind((":pos",pos)).expect("check2");
+
+        mov_down.next()?;
+        mov_up.next()?;
+
+
+
+    }
+
+    Ok(())
+}
+pub fn is_pos_unique(pos: i64, playlist: i64) -> Result<bool, anyhow::Error>{
+    let db = get_connection()?;
+    let mut stmt = db.prepare("
+        SELECT COUNT(playlist_pos)
+        FROM song_playlist_junction
+        WHERE playlist_pos = :pos AND playlist_id =:playlist;
+        ")?;
+    stmt.bind((":pos",pos))?;
+    stmt.bind((":playlist",playlist))?;
+
+    if stmt.next()? == State::Row{
+        let count :i64 = stmt.read(0)?;
+        return Ok(count == 1)
+    }else{
+        anyhow::bail!("can not figure if pos is unique");
+    }
+    
+}
+pub fn is_song_at_pos(pos:i64,playlist_id: i64) -> Result<bool,anyhow::Error>{
+    let db = get_connection()?;
+    let mut stmt = db.prepare("
+        SELECT COUNT(playlist_pos)
+        FROM song_playlist_junction
+        WHERE playlist_pos = :pos AND playlist_id =:playlist;
+        ")?;
+    stmt.bind((":pos",pos))?;
+    stmt.bind((":playlist",playlist_id))?;
+
+    if stmt.next()? == State::Row{
+        let count :i64 = stmt.read(0)?;
+        return Ok(count >0)
+    }else{
+        anyhow::bail!("can not figure if pos is unique");
+    }
+
+}
 pub fn add_song_to_playlist(song_id: i64, list_id:i64, playlist_pos: Option<i64>) -> Result<(), anyhow::Error>{
     
     
@@ -73,8 +166,10 @@ pub fn add_song_to_playlist(song_id: i64, list_id:i64, playlist_pos: Option<i64>
     let query = match playlist_pos{
 
         Some(e) => {
-            let mut stmt = db.prepare("INSERT INTO song_playlist_junction(song_id,playlist_id,playlist_pos) VALUES (:song_id,:playlist_id,:playlist_pos);")?;
-            //stmt.bind((1,song_id),(2,list_id),(3,e));
+            let mut stmt = db.prepare("
+                INSERT INTO song_playlist_junction(song_id,playlist_id,playlist_pos)
+                VALUES (:song_id,:playlist_id,:playlist_pos);
+                ")?;
             stmt.bind((":song_id",song_id))?;
 
             stmt.bind((":playlist_id",list_id))?;
@@ -84,8 +179,23 @@ pub fn add_song_to_playlist(song_id: i64, list_id:i64, playlist_pos: Option<i64>
         //Some(e) => format!("INSERT INTO song_playlist_junction(song_id,playlist_id,playlist_pos) VALUES ('{}','{}','{}');",song_id,list_id,e),
 
         None => {
-            let mut stmt = db.prepare("INSERT INTO song_playlist_junction(song_id,playlist_id) VALUES (:song_id,:playlist_id);")?;
+            let mut max_stmt = db.prepare("
+                SELECT MAX(playlist_pos)
+                FROM song_playlist_junction
+                WHERE playlist_id = :playlist_id;
+                ").expect("check1");
+            max_stmt.bind((":playlist_id",list_id))?;
+            let mut new_pos = 0;
+            if max_stmt.next()? == State::Row{
+                new_pos = max_stmt.read(0).expect("check3") ;
+                new_pos = new_pos +1 ;
+            }
+
+            let mut stmt = db.prepare("INSERT INTO song_playlist_junction
+            (song_id,playlist_id,playlist_pos)
+            VALUES (:song_id,:playlist_id, :playlist_pos);").expect("Error trying to insert song into playlist");
             //stmt.bind((song_id.into(),list_id.into()));
+            stmt.bind((":playlist_pos",new_pos));
             stmt.bind((":song_id",song_id))?;
             stmt.bind((":playlist_id",list_id))?;
             stmt.next()?;
@@ -109,7 +219,8 @@ pub fn get_song_info(index:&i64) -> Result<Song, anyhow::Error> {
         song_name: String::from("default"),
         path: String::from(""),
     };
-    let mut stmt = db.prepare(format!("SELECT * FROM songs WHERE song_id='{}';",&index))?;
+    let mut stmt = db.prepare(format!("SELECT * FROM songs 
+            WHERE song_id='{}';",&index))?;
                                                                                                                                 //
     while State::Row == stmt.next().expect(""){ // a statement has mult State(all returned rows) if
                                                 // they can be iterated with if Stat::done all rows
@@ -149,7 +260,30 @@ pub fn is_path_unique(song_path:&str) -> Result<bool,anyhow::Error>{
     stmt.bind((":song_path",song_path))?;
     Ok(State::Row != stmt.next()?)//returns true if not exists false if exists
 }
+pub fn get_song_by_path(song_path: &str) -> Result<Song, anyhow::Error>{
+    let db = get_connection()?;
+    let mut stmt = db.prepare("
+            SELECT * FROM songs
+            WHERE path = :song_path;
+        ")?;
+    stmt.bind((":song_path",song_path))?;
+    if stmt.next()? != State::Row{
+        anyhow::bail!("Song '{}' not found in get_song_by_path",song_path);
+    };                                             
 
+    let song_id= stmt.read(0).expect("Failed to read song_id");
+    let song_name = stmt.read(1).expect("Failed to read song_name");
+    eprintln!("song Name {}",song_name);
+    let  song = Song{
+        song_id: song_id,  
+        song_name: song_name,
+        path:String::from(song_path), 
+    };
+    Ok(song)
+ 
+
+
+}
 
 pub fn get_song_count() -> Result<i64, anyhow::Error>{
 
@@ -205,10 +339,53 @@ pub fn get_playlist_by_name(list_name :&str) -> Result<Playlist,anyhow::Error>{
         }
     }
 }
+
+pub fn get_playlist_by_id(id: i64) -> Result<Playlist,anyhow::Error>{
+    let db = get_connection()?;
+    let mut stmt = db.prepare("
+        SELECT * 
+        FROM playlist
+        WHERE list_id = :list_id;
+        ").expect("Check1");
+    stmt.bind((":list_id",id))?;
+    if stmt.next().expect("Check2") != State::Row{
+        anyhow::bail!("cant get playlist from id {}",id);
+    }
+    return Ok(Playlist{
+    list_id : stmt.read(0)?,
+    list_name : stmt.read(1)?,
+    })
+
+
+}
+pub fn get_song_pos(song: i64) -> Result<i64,anyhow::Error>{// returns song pos requires song_id
+                                                           // returns -1 if song pos is null
+    let db = get_connection()?;
+    let mut stmt = db.prepare("
+        SELECT playlist_pos
+        FROM song_playlist_junction
+        Where song_id = :song_id
+
+        ")?;
+    stmt.bind((":song_id",song))?;
+    if stmt.next()? != State::Row{
+        anyhow::bail!("song_id'{}' not found in song_playlist_junction",song);
+    };  
+
+    let number: i64 = stmt.read(0).expect("");
+    eprintln!("song pos {}",number);
+    Ok(number)
+
+
+}
 pub fn get_songs_from_playlist(p_playlist_name: &str) -> Result<Vec<Song>,anyhow::Error>{
     let db = get_connection()?;
     let playlist = get_playlist_by_name(p_playlist_name)?;
-    let mut stmt = match db.prepare(format!("SELECT * FROM song_playlist_junction WHERE playlist_id = '{}';",playlist.list_id)){
+    let mut stmt = match db.prepare(format!("
+            SELECT * FROM song_playlist_junction
+            WHERE playlist_id = '{}'
+            ORDER BY playlist_pos;
+            ",playlist.list_id)){
         Ok(t) => t,
         Err(e) => return Err(anyhow!("Error in db_service.rs: line 194 '{e}'")),
     };
