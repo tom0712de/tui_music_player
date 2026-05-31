@@ -18,7 +18,9 @@ pub struct Playlist{
 }
 //Function is used in this module only 
 pub fn get_connection() -> Result<Connection, anyhow::Error>{
-    let songs = sqlite::open("../music_player_DB.sqlite")?;
+   // let songs = sqlite::open("../music_player_DB.sqlite")?;
+
+    let songs = sqlite::open("/mnt/HDD/music/music_player_DB.sqlite")?;
     return Ok(songs)
 
 }
@@ -93,7 +95,6 @@ pub fn mov_song_up(song: &Song,playlist_id: i64,increment: i64) -> Result<(),any
     let pos = get_song_pos(song.song_id)?;
     let db = get_connection()?;
     let new_pos = pos + increment;
-    eprintln!("new pos {}",new_pos);
     if is_song_at_pos(new_pos,playlist_id)? && new_pos > 0{
         let mut mov_down = db.prepare("
             UPDATE song_playlist_junction
@@ -273,7 +274,6 @@ pub fn get_song_by_path(song_path: &str) -> Result<Song, anyhow::Error>{
 
     let song_id= stmt.read(0).expect("Failed to read song_id");
     let song_name = stmt.read(1).expect("Failed to read song_name");
-    eprintln!("song Name {}",song_name);
     let  song = Song{
         song_id: song_id,  
         song_name: song_name,
@@ -373,7 +373,6 @@ pub fn get_song_pos(song: i64) -> Result<i64,anyhow::Error>{// returns song pos 
     };  
 
     let number: i64 = stmt.read(0).expect("");
-    eprintln!("song pos {}",number);
     Ok(number)
 
 

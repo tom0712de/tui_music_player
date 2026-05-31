@@ -239,7 +239,6 @@ impl App {
                     KeyCode::Char('j') => self.editor.table_state.select_next(),
                     KeyCode::Backspace => self.back_space(),
                     KeyCode::Char('k') => self.editor.table_state.select_previous(),
-                    KeyCode::Char('e') => eprintln!("{:?}",self.editor.table_state.selected_cell()),
                     KeyCode::Char(c) => self.append_to_item(c),
                     _ => eprintln!("Keystroke not recognized"),
                 
@@ -262,7 +261,7 @@ impl App {
                     KeyCode::Char('l') => self.player_controller.controll(SoundControlls::SkipSong).expect(""),
                     KeyCode::Char('i') => self.i_pressed()?,
 
-                    _ => eprintln!("{:?}",self.song_list.table_state),
+                    _ => eprintln!("Error"),
                 }
             }
         Ok(())
@@ -346,7 +345,6 @@ impl App {
         let selected = self.song_list.table_state.selected().expect("");
         match &self.song_list.parent{
             Parent::playlist_name(p_name) =>{
-                eprintln!("parent = playlist");
                 let name = &self.song_list.rows[selected][0];
                 let song = db_service::get_song_by_name(name).expect("in i pressed()");
                 self.editor = editor::Editor::new(editor::EditorType::Song(song.song_id))?;
@@ -357,7 +355,6 @@ impl App {
                 
             },
             Parent::default => {
-                eprintln!("Parent == default");
                 let name = &self.song_list.rows[selected][0];
                 let playlist = db_service::get_playlist_by_name(name)?;
                 self.editor = editor::Editor::new(editor::EditorType::Playlist(playlist.list_id))?;

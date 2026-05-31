@@ -39,7 +39,6 @@ match app.run(&mut ratatui::DefaultTerminal::new(CrosstermBackend::new(stdout())
     Err(e) => eprintln!("Error: '{e}'"), //file.write_all(format!("Error in Main: '{}'",e).as_bytes()).expect(""), 
 };
 
-
 }
 
 

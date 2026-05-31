@@ -34,14 +34,18 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
             //DB adden
             //let list_id = playlist.list_id.clone();
             let playlist_name = playlist.list_name.clone();
-            if db_service::is_playlist_unique(&playlist.list_name)?{
-                db_service::add_playlist(playlist)?;
-            }
+            let songs_in_playlist = update_songs(&p_path).expect("Error trying to extract_songs");
+            if songs_in_playlist.len() > 0{
+                  
+                if db_service::is_playlist_unique(&playlist.list_name)?{
+                    db_service::add_playlist(playlist)?;
+                }
 
-            let list_id = db_service::get_playlist_by_name(&playlist_name)?.list_id;
-            for val in update_songs(&p_path).expect("Here"){
-                if !db_service::is_song_in_playlist(&val,&list_id)?{
-                    db_service::add_song_to_playlist(val,list_id, None)?;
+                let list_id = db_service::get_playlist_by_name(&playlist_name)?.list_id;
+                for val in songs_in_playlist{
+                    if !db_service::is_song_in_playlist(&val,&list_id)?{
+                        db_service::add_song_to_playlist(val,list_id, None)?;
+                    }
                 }
             }
         }
