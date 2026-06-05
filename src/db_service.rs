@@ -3,7 +3,7 @@ use::anyhow::anyhow;
 
 use::sqlite;
 use::sqlite::State;
-
+pub use crate::Config;
 #[derive(Debug)]
 
 pub struct Song {
@@ -12,20 +12,26 @@ pub struct Song {
     pub path: String,
 
 }
+
+#[derive(Default)]
 pub struct Playlist{
     pub list_id: i64,
     pub list_name: String,
+    pub is_user_created: bool, 
 }
 //Function is used in this module only 
 pub fn get_connection() -> Result<Connection, anyhow::Error>{
-   // let songs = sqlite::open("../music_player_DB.sqlite")?;
 
-    let songs = sqlite::open("/mnt/HDD/music/music_player_DB.sqlite")?;
+    let cfg: Config::Config = confy::load("Rusty-Music",None).expect("failed to load config");
+    let songs = sqlite::open(cfg.db_path.as_str())?;
+
+    //let songs = sqlite::open("/mnt/HDD/music/music_player_DB.sqlite")?;
     return Ok(songs)
 
 }
 
 pub fn init() -> Result<(), anyhow::Error>{
+     
     let songs = get_connection()?;
     let query = "Create Table IF NOT EXISTS songs(
         song_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,7 +43,8 @@ pub fn init() -> Result<(), anyhow::Error>{
 
     let query = "CREATE TABLE IF NOT EXISTS playlist(
         list_id INTEGER PRIMARY KEY AUTOINCREMENT,
-        list_name TEXT NOT NULL
+        list_name TEXT NOT NULL,
+        is_user_created INTEGER 
         );";
     songs.execute(query)?; // Playlist stored as list seperated with spaces of ids
 
@@ -301,8 +308,16 @@ pub fn is_playlist_unique(playlist_name: &str) -> Result<bool,anyhow::Error>{
 }
 pub fn add_playlist(playlist: Playlist) -> Result<(), anyhow::Error>{
     let db = get_connection()?;
-    let mut stmt = db.prepare("INSERT INTO playlist (list_name) VALUES (:list_name);")?;
+    let mut stmt = db.prepare("INSERT INTO playlist (list_name,is_user_created) 
+        VALUES (:list_name, :is_user_created);")?;
+        
     stmt.bind((":list_name",playlist.list_name.as_str()))?;
+    if playlist.is_user_created{
+        stmt.bind((":is_user_created","1"))?;
+    }else{
+        stmt.bind((":is_user_created","0"))?;
+    }
+
     //let query = format!("INSERT INTO playlist (list_name) VALUES ('{}');",playlist.list_name);
     //println!("query:{}",query);
     stmt.next()?;
@@ -316,6 +331,8 @@ pub fn get_all_playlist() -> Result<Vec<Playlist>, anyhow::Error>{
         let playlist = Playlist{
             list_id :stmt.read(0).expect("Error"),
             list_name : stmt.read(1).expect("error"),
+
+            ..Default::default()
         };
         v.push(playlist);
     }
@@ -324,16 +341,21 @@ pub fn get_all_playlist() -> Result<Vec<Playlist>, anyhow::Error>{
 
 pub fn get_playlist_by_name(list_name :&str) -> Result<Playlist,anyhow::Error>{
     let db = get_connection()?;
-    let mut stmt = db.prepare("SELECT * FROM playlist WHERE list_name= :list_name;").expect("");
-    stmt.bind((":list_name",list_name)).expect("");
-    match stmt.next().expect(""){
+    let mut stmt = db.prepare("SELECT * 
+        FROM playlist 
+        WHERE list_name= :list_name ;")?;
+    stmt.bind((":list_name",list_name))?;
+    match stmt.next()?{
         
         State::Done => return Err(anyhow!("Error in db_service line: 163 -> playlist by name '{list_name}' not found")),
 
         State::Row=>{
+            let byte: i64 = stmt.read(2).expect("temp debuf stop 2");
             let playlist = Playlist{
                 list_id: stmt.read(0).expect("Error"),
                 list_name: stmt.read(1).expect("Error"),
+                is_user_created: byte == 0,
+                ..Default::default() 
             };
             Ok(playlist)
         }
@@ -351,11 +373,46 @@ pub fn get_playlist_by_id(id: i64) -> Result<Playlist,anyhow::Error>{
     if stmt.next().expect("Check2") != State::Row{
         anyhow::bail!("cant get playlist from id {}",id);
     }
+
+    let byte: i64 = stmt.read(2)?;
     return Ok(Playlist{
     list_id : stmt.read(0)?,
     list_name : stmt.read(1)?,
+    is_user_created: byte == 0,
+    ..Default::default()
     })
 
+
+}
+
+pub fn get_user_created_playlist() -> Result<Vec<Playlist>,anyhow::Error>{
+    let db = get_connection()?;
+    let mut stmt = db.prepare("
+        SELECT * 
+        FROM playlist 
+        WHERE is_user_created = 1;
+        ")?;
+    let mut playlists: Vec<Playlist> = vec![];
+    while stmt.next()? == State::Row{
+        playlists.push(Playlist{
+            list_id : stmt.read(0)?,
+            list_name : stmt.read(1)?,
+            is_user_created: true,
+            ..Default::default()
+        });
+    }
+    return Ok(playlists)
+}
+pub fn remove_playlist(name: &str) -> Result<(),anyhow::Error>{
+    let db = get_connection()?;
+    let mut stmt = db.prepare("
+        DELETE FROM playlist
+        WHERE list_name = :list_name ; "
+    )?;
+    stmt.bind((":list_name",name))?;
+    stmt.next()?;
+
+    Ok(())
 
 }
 pub fn get_song_pos(song: i64) -> Result<i64,anyhow::Error>{// returns song pos requires song_id
@@ -398,4 +455,21 @@ pub fn get_songs_from_playlist(p_playlist_name: &str) -> Result<Vec<Song>,anyhow
     
     Ok(songs)
     
+}
+
+pub fn remove_song_from_playlist(playlist_id: i64, song_id: i64) -> Result<(),anyhow::Error>{
+    let db = get_connection()?;
+    let song = get_song_info(&song_id)?;
+    let playlist = get_playlist_by_id(playlist_id)?;
+    eprintln!("playlistid: {}",playlist.list_id);
+
+    eprintln!("song_id: {}",song.song_id);
+    let mut stmt = db.prepare("
+            DELETE  FROM song_playlist_junction
+            WHERE playlist_id = :playlist_id AND song_id = :song_id
+        ")?;
+    stmt.bind((":song_id",song.song_id))?;
+    stmt.bind((":playlist_id",playlist.list_id))?;
+    stmt.next()?;
+    Ok(())
 }

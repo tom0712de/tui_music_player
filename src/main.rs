@@ -10,7 +10,12 @@ pub mod file_service;
 pub mod tui_service;
 pub mod sound_service;
 pub mod editor;
+pub mod Config;
 fn main() {
+
+// load config
+let cfg: Config::Config = confy::load("Rusty-Music",None).expect("failed to load config");
+
 let _file = OpenOptions::new()
         .create(true)
         .write(true)
@@ -20,7 +25,7 @@ let _file = OpenOptions::new()
 
 
 //let musik_path = Path::new("/home/tom/Musik");//debug
-let musik_path = Path::new("/mnt/HDD/music"); //prod
+let musik_path = Path::new(cfg.music_path.as_str()); //prod
 match db_service::init(){
     Ok(()) => (),
     Err(e) => eprintln!("'Error while trying to call db_service::init in main: '{e}'")

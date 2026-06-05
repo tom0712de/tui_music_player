@@ -18,6 +18,7 @@ pub struct App {
     pub player_controller: sound_service::PlayerController, //abstraction Layer to controll the
     pub editor: editor::Editor,                                //audio playback
     pub show_edit: bool,
+     
     pub show_selected_mode: bool,
     pub terminal: DefaultTerminal,
     //pub current_edit:
@@ -30,6 +31,7 @@ impl App {
         player_controller: sound_service::PlayerController::new(),
         editor : editor::Editor::new(editor::EditorType::Default)?,
         show_edit: false,
+
         show_selected_mode: false, 
         terminal: (ratatui::DefaultTerminal::new(CrosstermBackend::new(stdout())).unwrap()),
 
@@ -112,16 +114,19 @@ impl App {
             .vertical_margin(1)
             .split(layout_1[1]);
         //----
+        //---- popup for creating playlist
+
         //--- popup for editing 
-        if self.show_edit {
+        if self.show_edit{
             // creates a Block in wich the editor is rendered
-            let popup_block = Block::bordered().title("edit");
+            //
+            let popup_block = Block::bordered().title("ligma");
             let centered_area = frame.area().centered(Constraint::Percentage(60),Constraint::Percentage(20));
             frame.render_widget(Clear, centered_area);
             //----
             //gets the song wich is edited
                    //----
-            let outer_edit = Block::bordered().title("Edit");
+            let outer_edit = Block::bordered().title(self.editor.editor_head.clone());
             //create Editor
 
             let paragraph = Paragraph::new("Lorem ipsum").block(popup_block);
@@ -236,11 +241,7 @@ impl App {
             //create Editor
                 match key_event.code{
                     KeyCode::Char('q') => self.exit_edit()?,
-                    KeyCode::Char('j') => self.editor.table_state.select_next(),
-                    KeyCode::Backspace => self.back_space(),
-                    KeyCode::Char('k') => self.editor.table_state.select_previous(),
-                    KeyCode::Char(c) => self.append_to_item(c),
-                    _ => eprintln!("Keystroke not recognized"),
+                    x => self.editor.handle_keys(x)?,
                 
         
                 }
@@ -250,6 +251,8 @@ impl App {
         }
         else {
                 match key_event.code{
+                    KeyCode::Char('D') => self.delete_current()?,
+                    KeyCode::Char('a') => self.playlist_adder()?,
                     KeyCode::Char('q') => self.q_pressed().expect(""),
                     KeyCode::Char('j') => self.song_list.table_state.select_next(),
                     KeyCode::Char('k') => self.song_list.table_state.select_previous(),
@@ -260,6 +263,7 @@ impl App {
                     KeyCode::Enter => self.enter_pressed().expect(""),
                     KeyCode::Char('l') => self.player_controller.controll(SoundControlls::SkipSong).expect(""),
                     KeyCode::Char('i') => self.i_pressed()?,
+                    KeyCode::Char('c') =>  self.create_playlist()?,
 
                     _ => eprintln!("Error"),
                 }
@@ -267,6 +271,7 @@ impl App {
         Ok(())
     
     }
+
     pub fn move_song(&mut self,increment:i64) -> Result<(),anyhow::Error>{
         // get song -> update song pos
         let selected = self.song_list.table_state.selected().expect("");
@@ -302,11 +307,40 @@ impl App {
 
 
     }
+    pub fn delete_current(&mut self) -> Result<(), anyhow::Error>{
+         
+        let selected = self.song_list.table_state.selected().expect("");
+        match &self.song_list.parent{
+            Parent::playlist_name(name) =>{
+                let song_name = &self.song_list.rows[selected][0];
+                let song = db_service::get_song_by_name(song_name).expect("in i pressed()");
+                let playlist = db_service::get_playlist_by_name(name)?;
+                db_service::remove_song_from_playlist(playlist.list_id, song.song_id)?;
+            }
+            Parent::default => {
+                
+                let list_name = &self.song_list.rows[selected][0];
+                db_service::remove_playlist(list_name)?;
+            }
+            _=> (),
+       }
+       let parent = match &self.song_list.parent{
+            Parent::playlist_name(name) => Parent::playlist_name(name.clone()),
+            Parent::default => Parent::default,
+
+        };
+        self.song_list = Song_List::new(parent)?;
+        self.song_list.table_state.select(Some(selected));
+
+
+       Ok(())
+    }
     pub fn exit_edit(&mut self) -> Result<(),anyhow::Error>{
         
         let selected = self.song_list.table_state.selected().expect("");
         match self.editor.save(){
             Ok(_) => self.show_edit = false,
+
             Err(e) => eprintln!("cant save current edit Error {}",e),
         }
 
@@ -340,6 +374,11 @@ impl App {
         };
 
     }
+    pub fn create_playlist(&mut self) -> Result<(),anyhow::Error>{
+        self.show_edit = true;
+        self.editor = editor::Editor::new(editor::EditorType::NewPlaylist)?;
+        return Ok(())
+    }
     pub fn i_pressed(&mut self) -> Result<(),anyhow::Error>{
         self.show_edit = true;
         let selected = self.song_list.table_state.selected().expect("");
@@ -364,6 +403,20 @@ impl App {
 
 
        Ok(())
+
+    }
+    pub fn playlist_adder(&mut self) -> Result<(),anyhow::Error>{
+        self.show_edit = true;
+
+        let selected = self.song_list.table_state.selected().expect("");
+        let name = &self.song_list.rows[selected][0];
+        eprintln!("name {}",name);
+        let song = db_service::get_song_by_name(name).expect("in i pressed()");
+
+
+
+        self.editor = editor::Editor::new(editor::EditorType::AddToPlaylist(song.song_id))?;
+        Ok(())
 
     }
 

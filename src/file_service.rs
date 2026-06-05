@@ -22,6 +22,7 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
             let mut playlist = db_service::Playlist{
                 list_id: 0,
                 list_name: String::from(""),
+                ..Default::default()
             };
             // Namen Formatieren 
             let p_path = path.clone();
@@ -41,7 +42,7 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
                     db_service::add_playlist(playlist)?;
                 }
 
-                let list_id = db_service::get_playlist_by_name(&playlist_name)?.list_id;
+                let list_id = db_service::get_playlist_by_name(&playlist_name).expect("temp debug stop").list_id;
                 for val in songs_in_playlist{
                     if !db_service::is_song_in_playlist(&val,&list_id)?{
                         db_service::add_song_to_playlist(val,list_id, None)?;
