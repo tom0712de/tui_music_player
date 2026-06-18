@@ -66,7 +66,7 @@ impl App {
             }
         }
         crossterm::terminal::disable_raw_mode()?;
-        terminal.clear();
+        terminal.clear()?;
 
         
         //---
@@ -153,8 +153,33 @@ impl App {
         }
         // ---------Create Table wich show selectable songs/albumns
         //--- Block around main Block
+        let title = match &self.song_list.parent{
+            Parent::Filter(filter,_is_song) =>{
+                match filter{
+                    Filters::ShowAll => String::from("All Playlists"),
+                    Filters::Author(name) => String::from("Select Authors to sort "),
+                    _ => String::from("songs")
+                } 
+            },
+            Parent::playlist_name(name) =>{
+                name.to_string()
+
+            }
+            Parent::specific_attribute(filter,_is_song) =>{
+                match filter{
+                    Filters::ShowAll => String::from("All Playlists"),
+                    Filters::Author(name) => format!("All  Music from {}",name.clone()),
+                    _ => String::from("songs")
+                    }
+
+            }
+
+            _ => String::from("songs")
+
+
+        };
         let outer_main = Block::bordered()
-            .title("Songs");
+            .title(title);
 
         let widths = [ // Widths for table rows
             Constraint::Percentage(70),
@@ -210,7 +235,7 @@ impl App {
                         rows.push(Row::new(vec![db_service::get_song_info(&val).expect("in render in tui_service 123").song_name]));
                     }
                     let outer_right = Block::bordered()
-                        .title("NEXT SONG");
+                        .title("Wait list");
 
                     let table = Table::new(rows,widths)
                         .block(outer_right);
@@ -226,7 +251,7 @@ impl App {
 
         //---- Outer Block
         let outer_block = Block::bordered()
-        .title("Music Player");
+        .title("Rusty Music Player");
         frame.render_widget(outer_block, frame.area());
 
     }
@@ -345,6 +370,15 @@ impl App {
                 
                 let list_name = &self.song_list.rows[selected][0];
                 db_service::remove_playlist(list_name)?;
+            }
+            Parent::specific_attribute(_filter,is_song) =>{
+                if *is_song{
+       
+
+                }else{
+                    let list_name = &self.song_list.rows[selected][0];
+                    db_service::remove_playlist(list_name)?;
+                }
             }
             _=> (),
         }
