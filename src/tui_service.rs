@@ -18,7 +18,6 @@ pub struct App {
     pub player_controller: sound_service::PlayerController, //abstraction Layer to controll the
     pub editor: editor::Editor,                                //audio playback
     pub show_edit: bool,
-     
     pub show_selected_mode: bool,
     pub terminal: DefaultTerminal,
     //pub current_edit:
@@ -180,7 +179,7 @@ impl App {
         // check if the result is Ok
         if let Ok(guard) = self.player_controller.current_song.try_read(){
             if let Some(i) = *guard{
-               song_id = i.clone();
+               song_id= i.clone();
             }
         }
         let name: String =  db_service::get_song_info(&song_id).expect("Error in render in tui service").song_name;
@@ -264,6 +263,7 @@ impl App {
                     KeyCode::Char('l') => self.player_controller.controll(SoundControlls::SkipSong).expect(""),
                     KeyCode::Char('i') => self.i_pressed()?,
                     KeyCode::Char('c') =>  self.create_playlist()?,
+                    KeyCode::Char('L') => self.switch_filter()?,
 
                     _ => eprintln!("Error"),
                 }
@@ -271,7 +271,27 @@ impl App {
         Ok(())
     
     }
+    pub fn switch_filter(&mut self) -> Result<(),anyhow::Error>{
+        self.song_list = Song_List::new(match &self.song_list.parent{
+            Parent::Filter(filter,is_song) => match filter{ 
+                Filters::ShowAll => Parent::Filter(Filters::Author(String::default()),*is_song),
+                Filters::Author(_name) => Parent::specific_attribute(Filters::ShowAll,*is_song)
 
+            }
+            Parent::specific_attribute(filter, is_song) => match filter{
+
+                Filters::ShowAll => Parent::Filter(Filters::Author(String::default()),*is_song),
+
+                _ => Parent::specific_attribute(Filters::ShowAll,*is_song)
+            }
+            _ => Parent::specific_attribute(Filters::ShowAll,false),
+
+        })?;
+        Ok(())
+
+
+
+    }
     pub fn move_song(&mut self,increment:i64) -> Result<(),anyhow::Error>{
         // get song -> update song pos
         let selected = self.song_list.table_state.selected().expect("");
@@ -299,6 +319,10 @@ impl App {
                 }
            },
            Parent::default => (),
+           _ => (),  
+                 
+
+           
         }
         Ok(())
         //db_service::mov_song_up(&song,4);
@@ -323,11 +347,16 @@ impl App {
                 db_service::remove_playlist(list_name)?;
             }
             _=> (),
-       }
+        }
        let parent = match &self.song_list.parent{
             Parent::playlist_name(name) => Parent::playlist_name(name.clone()),
             Parent::default => Parent::default,
-
+            Parent::specific_attribute(Filter,is_song) => {
+                let filter = Filter.clone();
+                
+                Parent::specific_attribute(filter,is_song.clone())
+            },
+            _ => Parent::default
         };
         self.song_list = Song_List::new(parent)?;
         self.song_list.table_state.select(Some(selected));
@@ -348,6 +377,12 @@ impl App {
             Parent::playlist_name(name) => Parent::playlist_name(name.clone()),
             Parent::default => Parent::default,
 
+            Parent::specific_attribute(Filter,is_song) => {
+                let filter = Filter.clone(); 
+                Parent::specific_attribute(filter,is_song.clone())
+
+            },
+            _ => Parent::default 
         };
         self.song_list = Song_List::new(parent)?;
         self.song_list.table_state.select(Some(selected));
@@ -393,12 +428,12 @@ impl App {
 
                 
             },
-            Parent::default => {
+            _ => {
+
                 let name = &self.song_list.rows[selected][0];
                 let playlist = db_service::get_playlist_by_name(name)?;
                 self.editor = editor::Editor::new(editor::EditorType::Playlist(playlist.list_id))?;
-            },
-
+            }
         }
 
 
@@ -421,23 +456,34 @@ impl App {
     }
 
     pub fn q_pressed(&mut self) -> Result<(),anyhow::Error>{
-        match self.song_list.parent{
+        match &self.song_list.parent{
             Parent::playlist_name(_) =>{
 
-                self.song_list = Song_List::new(Parent::default).expect("");
+                self.song_list = Song_List::new(Parent::specific_attribute(Filters::ShowAll,false)).expect("");
 
 
             },
             Parent::default =>{
                 self.is_exit = true;
             },
+            Parent::specific_attribute(filters,_is_song) => {
+                match filters.clone() {
+                    Filters::ShowAll => self.is_exit = true,
+                    Filters::Author(..) => self.song_list = Song_List::new(Parent::Filter(Filters::Author(String::default()),false))?,
+                    _ => self.song_list = Song_List::new(Parent::specific_attribute(Filters::ShowAll,false))?,
+
+
+                }
+
+            }
+            _ => self.song_list = Song_List::new(Parent::specific_attribute(Filters::ShowAll,false)).expect(""),
 
         }
         Ok(())
     }
 
     pub fn enter_pressed(&mut self) -> Result<(),anyhow::Error>{
-        match self.song_list.parent{
+        match &self.song_list.parent{
             Parent::playlist_name(_) =>{
                 let selected = self.song_list.table_state.selected().expect("here");
                 let name = &self.song_list.rows[selected][0];
@@ -452,13 +498,38 @@ impl App {
                 let name = &self.song_list.rows[r][0];
                 let songs = db_service::get_songs_from_playlist(name)?;
                 let _ = self.player_controller.controll(SoundControlls::AddPlaylist(songs));
+            },
+            Parent::specific_attribute(_filter,is_song) => {
+                if *is_song{
+
+
+                }else{
+                    let r = match self.song_list.table_state.selected(){
+                        Some(t) => t,
+                        None => return Err (anyhow!("Error in db::db_service::handle_key_press, can not acces Elemtent ")),
+                    };
+                    let name = &self.song_list.rows[r][0];
+                    let songs = db_service::get_songs_from_playlist(name)?;
+                    let _ = self.player_controller.controll(SoundControlls::AddPlaylist(songs));
+
+                }
+            },
+            Parent::Filter(filter,is_song) => {
+                match filter{
+                    Filters::Author(_name) => todo!("implement queuing all songs from author in filterd mode"),
+                    _ => ()
+
+                }
+
             }
+            
+            _ => (),
         }
         Ok(())
     }
 
     pub fn e_pressed(&mut self) -> Result<(),anyhow::Error>{
-        match self.song_list.parent{
+        match &self.song_list.parent{
             Parent::playlist_name(_) =>{
                 let selected = self.song_list.table_state.selected().expect("here");
                 let name = &self.song_list.rows[selected][0];
@@ -474,6 +545,31 @@ impl App {
                 let parent = Parent::playlist_name(db_service::get_playlist_by_name(name)?.list_name);
                 self.song_list = Song_List::new(parent)?; 
             }
+            Parent::Filter(filter, is_song) =>{
+                let selected = self.song_list.table_state.selected().expect("here");
+                let name = &self.song_list.rows[selected][0];
+                let new_filter= match filter{
+                    Filters::Author(_na) => Filters::Author(name.to_string()),
+                    
+                    _ => Filters::Author(name.to_string()),
+
+                };
+                let parent = Parent::specific_attribute(new_filter,is_song.clone());
+                self.song_list = Song_List::new(parent)?;
+            }
+            Parent::specific_attribute(filter, is_song) => {
+                 let r = match self.song_list.table_state.selected(){
+                    Some(t) => t,
+                    None => return Err (anyhow!("Error in db::db_service::handle_key_press, can not acces Elemtent ")),
+                };
+                let name = &self.song_list.rows[r][0];
+                let parent = Parent::playlist_name(db_service::get_playlist_by_name(name)?.list_name);
+                self.song_list = Song_List::new(parent)?; 
+  
+                
+
+            }
+            _ =>(),
         }
         Ok(())
     }
@@ -489,14 +585,29 @@ impl Drop for App {
     }
 
 }
+#[derive(Clone)]
+pub enum Filters{
+    ShowAll,
+    Author(String)
+}
 
-    
+impl Filters{
+    fn next(self) -> Self{
+        match self{
+            Filters::ShowAll => Filters::Author(String::default()),
+            Filters::Author(..) => Filters::ShowAll,
+        }
+
+    }
+}
 
 
 
 pub enum Parent{
     playlist_name(String),
+    specific_attribute(Filters,bool),
     default,
+    Filter(Filters,bool) ,// if true the Filter shows songs if false the filter shows playlists
 }
 pub struct Song_List{ //stores information about current albums/Songs that are displayed in the
                       //main table
@@ -530,14 +641,49 @@ impl Song_List{
                 Ok(Self{
                     rows:rows,
                     parent:Parent::playlist_name(t),
-                    table_state: TableState::new().with_selected(Some(0)),
+                   table_state: TableState::new().with_selected(Some(0)),
                 })
+
+            }
+            Parent::Filter(t,bool) =>{
+                let mut rows: Vec<Vec<String>> = vec![];
+                for val in db_service::get_filterd(bool,&t)?{
+                    rows.push(vec![val])
+                }
+                Ok(Self{
+                    rows,
+                    parent: Parent::Filter(t,bool),
+                   table_state: TableState::new().with_selected(Some(0)),
+                })
+            }
+
+                        
+
+         
+
+            Parent::specific_attribute(filter,is_song)=>{
+            let mut rows: Vec<Vec<String>> = vec![];
+
+            for val in  db_service::get_filterd_specified(is_song,&filter)?{
+                if is_song{
+                    let name =  db_service::get_song_info(&val)?.song_name;
+                    rows.push(vec![name]);
+                }
+                else{
+                    let name = db_service::get_playlist_by_id(val)?.list_name;
+                    rows.push(vec![name]);
+                }
+            }
+
+            Ok(Self{
+                rows:rows,
+                parent:Parent::specific_attribute(filter,is_song),
+                table_state: TableState::new().with_selected(Some(0)),
+            })
+
 
             }
 
         }
     }
-            
-                
-        
 }

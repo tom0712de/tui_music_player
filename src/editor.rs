@@ -80,7 +80,8 @@ impl  Editor{
             })}
             EditorType::Playlist(p_list_id) =>{
                 let playlist = db_service::get_playlist_by_id(p_list_id)?;
-                let items = vec![(String::from("name"),playlist.list_name.clone())];
+                let items = vec![(String::from("name"),playlist.list_name.clone())
+                    ,((String::from("author"),playlist.author.clone()))];
                 return Ok(Self{
                     items,
                     editor_type: EditorType::Playlist(p_list_id),
@@ -89,7 +90,7 @@ impl  Editor{
                 })
             },
             EditorType::NewPlaylist =>{
-                let items = vec![(String::from("name"),String::from("_"))];
+                let items = vec![(String::from("name"),String::from("_")),(String::from("Author"),String::from(""))];
                 return Ok(Self{
                     items,
                     editor_type: EditorType::NewPlaylist,
@@ -117,6 +118,7 @@ impl  Editor{
             EditorType::Playlist(id) =>{
                 let mut playlist = db_service::get_playlist_by_id(id)?;
                 playlist.list_name = self.items[0].1.clone();
+                playlist.author = self.items[1].1.clone();
                 db_service::update_playlist(&playlist)?;
                 Ok(())
             },
@@ -125,6 +127,7 @@ impl  Editor{
                     list_id : 0,
                     list_name : self.items[0].1.clone(),
                     is_user_created : true,
+                    author: String::from(""),
                 
                 };
                 db_service::add_playlist(playlist)?;
@@ -164,11 +167,11 @@ impl  Editor{
         match self.editor_type{
             EditorType::AddToPlaylist(song_id) =>{
                 match key{
-                    KeyCode::Char('e') => {
+                    KeyCode::Char(',') => {
                         self.save_to_playlist(song_id)?;
                     }
-                    KeyCode::Char('j') => self.table_state.select_next(),
-                    KeyCode::Char('k') => self.table_state.select_previous(),
+                    KeyCode::Down => self.table_state.select_next(),
+                    KeyCode::Up => self.table_state.select_previous(),
 
 
                     _ => (),
@@ -177,8 +180,8 @@ impl  Editor{
             },
             _ =>{
                 match key {
-                    KeyCode::Char('j') => self.table_state.select_next(),
-                    KeyCode::Char('k') => self.table_state.select_previous(),
+                    KeyCode::Down=> self.table_state.select_next(),
+                    KeyCode::Up => self.table_state.select_previous(),
                     KeyCode::Backspace => self.back_space(),
                     KeyCode::Char(c) => self.append_to_item(c),
                     _ => (),

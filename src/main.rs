@@ -35,8 +35,8 @@ match file_service::update_songs(&musik_path){
     Err(e) => eprintln!("Error while trying to update Songs from main: '{e}'"), 
 
 };
-db_service::get_song_count();
-let mut app = tui_service::App::new(tui_service::Parent::default).unwrap();
+let mut app = tui_service::App::new(
+        tui_service::Parent::specific_attribute(tui_service::Filters::ShowAll,false)).unwrap();
 //let sound = sound_service::new();
 //sound.add_song_to_queue(db::service::get_song_info())
 match app.run(&mut ratatui::DefaultTerminal::new(CrosstermBackend::new(stdout())).unwrap()){
