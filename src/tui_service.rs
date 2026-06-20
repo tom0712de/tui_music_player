@@ -20,7 +20,6 @@ pub struct App {
     pub show_edit: bool,
     pub show_selected_mode: bool,
     pub terminal: DefaultTerminal,
-    //pub current_edit:
 }
 impl App {
     pub fn new(p_parent: Parent) -> Result<Self,anyhow::Error>{
