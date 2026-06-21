@@ -30,7 +30,9 @@ impl  Editor{
             EditorType::Song(p_song_id) =>{
                 
                 let song = db_service::get_song_info(&p_song_id)?;
-                let items = vec![(String::from("name"),song.song_name)];
+                let items = vec![(String::from("name"),song.song_name),
+                    (String::from("genre"),song.genre),
+                    (String::from("author"),song.author)];
                 eprintln!("{:?}",items);
                 
                 return Ok(Self{

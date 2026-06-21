@@ -64,11 +64,15 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
             }
 
 
-            
+            //todo!("implement id3 metadata reader");
             let song = db_service::Song{
                 song_id: 0,
                 song_name: song_name.to_string(),
                 path: song_path,
+                author: String::from("not specified"),
+                genre: String::from("not specified"),
+                year: 2,
+                ..Default::default()
             };
             if db_service::is_path_unique(&song.path)?{
                 db_service::add_song(&song)?;

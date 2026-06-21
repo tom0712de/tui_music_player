@@ -8,11 +8,14 @@ pub use crate::tui_service;
 
 #[derive(Debug)]
 
+#[derive(Default)]
 pub struct Song {
     pub song_id: i64,
     pub song_name: String,
     pub path: String,
-
+    pub genre: String,
+    pub author: String,
+    pub year: i64,
 
 }
 
@@ -25,7 +28,26 @@ pub struct Playlist{
     pub genre: String,
     
 }
+pub fn parse_stmt_to_song(mut stmt: sqlite::Statement) -> Result<Song,anyhow::Error>{
+    if stmt.next()? != State::Row{
 
+        anyhow::bail!("could not parse stmt, SQL Query didnt return a Song")
+
+    }else{
+        let song = Song{
+            song_id: stmt.read(0).expect("1"),
+            song_name: stmt.read(1)?,
+            path: stmt.read(2).expect("2"),
+            genre: stmt.read(4).expect("3"),
+            author: stmt.read(3).expect("4"),
+            year: stmt.read(5).expect("44"),
+            ..Default::default()
+        };
+        Ok(song)
+
+    }
+    
+}
 //Function is used in this module only 
 //
 pub fn parse_stmt_to_playlist(mut stmt: sqlite::Statement) -> Result<Playlist,anyhow::Error>{
@@ -64,7 +86,10 @@ pub fn init() -> Result<(), anyhow::Error>{
     let query = "Create Table IF NOT EXISTS songs(
         song_id INTEGER PRIMARY KEY AUTOINCREMENT,
         song_name TEXT NOT NULL,
-        path TEXT NOT NULL
+        path TEXT NOT NULL,
+        author TEXT NOT NULL,
+        genre TEXT NOT NULL,
+        year INTEGER NOT NULL
         );";
 
     songs.execute(query)?;
@@ -100,10 +125,15 @@ pub fn init() -> Result<(), anyhow::Error>{
 pub fn add_song(song:&Song) -> Result<(), anyhow::Error>{ //needs sql injec proof
     let db = get_connection()?;
 
-    let mut stmt = db.prepare("INSERT INTO songs(song_name, path) VALUES (:song_name,:path);")?;
+    let mut stmt = db.prepare("INSERT INTO songs
+        (song_name, path,author,genre,year) 
+        VALUES (:song_name,:path, :author, :genre, :year);")?;
     //stmt.bind((song.song_name.as_str(),song.path.as_str()));
     stmt.bind((":song_name",song.song_name.as_str()))?;
     stmt.bind((":path",song.path.as_str()))?;
+    stmt.bind((":author", song.author.as_str()))?;
+    stmt.bind((":genre", song.genre.as_str()))?;
+    stmt.bind((":year", song.year))?;
     stmt.next()?;    
 
 //    let query = format!("INSERT INTO songs(song_name, path) VALUES ('{}','{}');",song.song_name,song.path);
@@ -111,6 +141,7 @@ pub fn add_song(song:&Song) -> Result<(), anyhow::Error>{ //needs sql injec proo
 }
 pub fn update_song(song: &Song) -> Result<(), anyhow::Error>{
     let db = get_connection()?;
+    todo!("impelemnt proper update");
     let mut stmt = db.prepare("
         UPDATE songs
         SET Song_name = :song_name
@@ -391,21 +422,12 @@ pub fn is_song_in_playlist(song_id: &i64, list_id:&i64) -> Result<bool,anyhow::E
 }
 
 pub fn get_song_info(index:&i64) -> Result<Song, anyhow::Error> {
-
+    dbg!(index);
     let db = get_connection()?;
-    let mut song = Song{
-        song_id: *index,  
-        song_name: String::from("default"),
-        path: String::from(""),
-    };
-    let mut stmt = db.prepare(format!("SELECT * FROM songs 
-            WHERE song_id='{}';",&index))?;
-                                                                                                                                //
-    while State::Row == stmt.next().expect(""){ // a statement has mult State(all returned rows) if
-                                                // they can be iterated with if Stat::done all rows
-        song.song_name = stmt.read(1).expect("Failed to read song_name");
-        song.path = stmt.read(2)?;
-    }  
+    let mut stmt = db.prepare("SELECT * FROM songs
+        WHERE song_id = :song_id; ")?;
+    stmt.bind((":song_id",*index))?;
+    let song = parse_stmt_to_song(stmt)?;
     Ok(song)
 
 }
@@ -413,20 +435,8 @@ pub fn get_song_by_name(song_name: &str) -> Result<Song, anyhow::Error>{
     let db = get_connection()?;
     let mut stmt = db.prepare("SELECT * FROM songs WHERE song_name= :song_name;")?;
     stmt.bind((":song_name",song_name))?;
-                                                                                                                                //
-    //if let State::Row = stmt.next().expect("Error trying to sql"){ // a statement has mult State(all returned rows) if
-    if stmt.next()? != State::Row{
-        anyhow::bail!("Song '{}' not found in get_song_by_name",song_name);
-    };                                             
-    let song_id= stmt.read(0).expect("Failed to read song_id");
-    let path = stmt.read(2).expect("Failed to read song_path");
-    let  song = Song{
-        song_id: song_id,  
-        song_name: song_name.to_string(), 
-        path:path, 
-    };
-
-      
+    let song = parse_stmt_to_song(stmt)?;
+          
     Ok(song)
 
 
@@ -446,17 +456,8 @@ pub fn get_song_by_path(song_path: &str) -> Result<Song, anyhow::Error>{
             WHERE path = :song_path;
         ")?;
     stmt.bind((":song_path",song_path))?;
-    if stmt.next()? != State::Row{
-        anyhow::bail!("Song '{}' not found in get_song_by_path",song_path);
-    };                                             
-
-    let song_id= stmt.read(0).expect("Failed to read song_id");
-    let song_name = stmt.read(1).expect("Failed to read song_name");
-    let  song = Song{
-        song_id: song_id,  
-        song_name: song_name,
-        path:String::from(song_path), 
-    };
+    
+    let song = parse_stmt_to_song(stmt).expect("error found here in by path");
     Ok(song)
  
 

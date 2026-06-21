@@ -208,7 +208,12 @@ impl App {
                song_id= i.clone();
             }
         }
-        let name: String =  db_service::get_song_info(&song_id).expect("Error in render in tui service").song_name;
+        let mut name: String = String::from("no Song Playing");
+        if song_id != 0{
+
+            name =  db_service::get_song_info(&song_id).
+                expect("Error in render in tui service").song_name;
+        }
           
         let block = Block::bordered().title("Currently Playing");
         let paragraph = ratatui::widgets::Paragraph::new(format!(

@@ -18,7 +18,8 @@ let cfg: Config::Config = confy::load("Rusty-Music",None).expect("failed to load
 
 
 
-//let musik_path = Path::new("/home/tom/Musik");//debug
+//let musik_path = Path::new("/rc/main.rs
+//me/tom/Musik");//debug
 let musik_path = Path::new(cfg.music_path.as_str()); //prod
 match db_service::init(){
     Ok(()) => (),
