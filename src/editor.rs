@@ -81,7 +81,7 @@ impl  Editor{
             EditorType::Playlist(p_list_id) =>{
                 let playlist = db_service::get_playlist_by_id(p_list_id)?;
                 let items = vec![(String::from("name"),playlist.list_name.clone())
-                    ,((String::from("author"),playlist.author.clone()))];
+                    ,((String::from("author"),playlist.author.clone())),(String::from("genre"),playlist.genre.clone())];
                 return Ok(Self{
                     items,
                     editor_type: EditorType::Playlist(p_list_id),
@@ -119,6 +119,7 @@ impl  Editor{
                 let mut playlist = db_service::get_playlist_by_id(id)?;
                 playlist.list_name = self.items[0].1.clone();
                 playlist.author = self.items[1].1.clone();
+                playlist.genre = self.items[2].1.clone();
                 db_service::update_playlist(&playlist)?;
                 Ok(())
             },
@@ -128,7 +129,7 @@ impl  Editor{
                     list_name : self.items[0].1.clone(),
                     is_user_created : true,
                     author: String::from(""),
-                
+                    ..Default::default()
                 };
                 db_service::add_playlist(playlist)?;
                 return Ok(())

@@ -157,6 +157,7 @@ impl App {
                 match filter{
                     Filters::ShowAll => String::from("All Playlists"),
                     Filters::Author(name) => String::from("Select Authors to sort "),
+                    Filters::Genre(_name) => String::from("Select Genre to sort from"),
                     _ => String::from("songs")
                 } 
             },
@@ -166,8 +167,9 @@ impl App {
             }
             Parent::specific_attribute(filter,_is_song) =>{
                 match filter{
-                    Filters::ShowAll => String::from("All Playlists"),
+                    Filters::ShowAll => format!("All Playlists"),
                     Filters::Author(name) => format!("All  Music from {}",name.clone()),
+                    Filters::Genre(name) => format!("{} Muisc",name.clone()),
                     _ => String::from("songs")
                     }
 
@@ -285,7 +287,9 @@ impl App {
                     KeyCode::Char('K') => self.move_song(-1)?,
                     KeyCode::Enter => self.enter_pressed().expect(""),
                     KeyCode::Char('l') => self.player_controller.controll(SoundControlls::SkipSong).expect(""),
-                    KeyCode::Char('i') => self.i_pressed()?,
+                    KeyCode::Char('i') => match self.i_pressed(){
+                        _ => (),
+                    },
                     KeyCode::Char('c') =>  self.create_playlist()?,
                     KeyCode::Char('L') => self.switch_filter()?,
 
@@ -299,8 +303,9 @@ impl App {
         self.song_list = Song_List::new(match &self.song_list.parent{
             Parent::Filter(filter,is_song) => match filter{ 
                 Filters::ShowAll => Parent::Filter(Filters::Author(String::default()),*is_song),
-                Filters::Author(_name) => Parent::specific_attribute(Filters::ShowAll,*is_song)
-
+                Filters::Author(_name) => Parent::Filter(Filters::Genre(String::default()),*is_song),
+                Filters::Genre(_name) => Parent::specific_attribute(Filters::ShowAll,*is_song),
+                
             }
             Parent::specific_attribute(filter, is_song) => match filter{
 
@@ -448,10 +453,11 @@ impl App {
         return Ok(())
     }
     pub fn i_pressed(&mut self) -> Result<(),anyhow::Error>{
-        self.show_edit = true;
         let selected = self.song_list.table_state.selected().expect("");
         match &self.song_list.parent{
             Parent::playlist_name(p_name) =>{
+
+                self.show_edit = true;
                 let name = &self.song_list.rows[selected][0];
                 let song = db_service::get_song_by_name(name).expect("in i pressed()");
                 self.editor = editor::Editor::new(editor::EditorType::Song(song.song_id))?;
@@ -461,12 +467,17 @@ impl App {
 
                 
             },
-            _ => {
+            Parent::specific_attribute(filter,_bool)=> {
+                        eprintln!("matched Filter");
+                        self.show_edit = true;
+                        let name = &self.song_list.rows[selected][0];
+                        let playlist = db_service::get_playlist_by_name(name)?;
+                        self.editor = editor::Editor::new(editor::EditorType::Playlist(playlist.list_id))?;
 
-                let name = &self.song_list.rows[selected][0];
-                let playlist = db_service::get_playlist_by_name(name)?;
-                self.editor = editor::Editor::new(editor::EditorType::Playlist(playlist.list_id))?;
+
             }
+
+            _ => anyhow::bail!("i pressed not implemented")
         }
 
 
@@ -583,7 +594,7 @@ impl App {
                 let name = &self.song_list.rows[selected][0];
                 let new_filter= match filter{
                     Filters::Author(_na) => Filters::Author(name.to_string()),
-                    
+                    Filters::Genre(_na) => Filters::Genre(name.to_string()),                    
                     _ => Filters::Author(name.to_string()),
 
                 };
@@ -621,6 +632,7 @@ impl Drop for App {
 #[derive(Clone)]
 pub enum Filters{
     ShowAll,
+    Genre(String),
     Author(String)
 }
 
@@ -628,7 +640,8 @@ impl Filters{
     fn next(self) -> Self{
         match self{
             Filters::ShowAll => Filters::Author(String::default()),
-            Filters::Author(..) => Filters::ShowAll,
+            Filters::Author(..) => Filters::Genre(String::default()),
+            Filters::Genre(..) => Filters::ShowAll,
         }
 
     }

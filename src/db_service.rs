@@ -5,6 +5,7 @@ use::sqlite;
 use::sqlite::State;
 pub use crate::Config;
 pub use crate::tui_service;
+
 #[derive(Debug)]
 
 pub struct Song {
@@ -21,9 +22,32 @@ pub struct Playlist{
     pub list_name: String,
     pub is_user_created: bool, 
     pub author: String,
+    pub genre: String,
     
 }
+
 //Function is used in this module only 
+//
+pub fn parse_stmt_to_playlist(mut stmt: sqlite::Statement) -> Result<Playlist,anyhow::Error>{
+    if stmt.next()? == State::Row{
+        let byte: i64 = stmt.read(2)?;
+        let playlist = Playlist{
+                list_id :stmt.read(0)?,
+                list_name : stmt.read(1)?,
+                is_user_created : byte == 1,
+                author: stmt.read(3)?,
+                genre: stmt.read(4)?,
+                ..Default::default()
+                };
+
+
+        Ok(playlist)
+    }else{
+        anyhow::bail!("Error trying to parse stmt");
+
+    }
+
+}
 pub fn get_connection() -> Result<Connection, anyhow::Error>{
 
     let cfg: Config::Config = confy::load("Rusty-Music",None).expect("failed to load config");
@@ -49,7 +73,8 @@ pub fn init() -> Result<(), anyhow::Error>{
         list_id INTEGER PRIMARY KEY AUTOINCREMENT,
         list_name TEXT NOT NULL,
         is_user_created INTEGER,
-        author TEXT
+        author TEXT,
+        genre TEXT
         );";
     songs.execute(query)?; // Playlist stored as list seperated with spaces of ids
 
@@ -125,16 +150,18 @@ pub fn update_playlist(playlist: &Playlist) -> Result<(),anyhow::Error>{
     let mut stmt = db.prepare("
         UPDATE playlist
         SET list_name = :list_name,
-        author = :author
+        author = :author,
+        genre = :genre
 
         WHERE list_id = :list_id
         ")?;
     stmt.bind((":list_name",playlist.list_name.as_str()))?;
     stmt.bind((":list_id",playlist.list_id))?;
     stmt.bind((":author",playlist.author.as_str()))?;
+    stmt.bind((":genre",playlist.genre.as_str()))?;
+
     stmt.next()?;
-    Ok(())
-}
+    Ok(()) }
 pub fn get_playlists_from_artists(name: &str) -> Result<Vec<Playlist>,anyhow::Error>{
     let db = get_connection()?;
     let mut stmt = db.prepare("
@@ -150,7 +177,8 @@ pub fn get_playlists_from_artists(name: &str) -> Result<Vec<Playlist>,anyhow::Er
             list_id : stmt.read(0)?,
             list_name : stmt.read(1)?,
             is_user_created : (byte == 1),
-            author: stmt.read(3)?
+            author: stmt.read(3)?,
+            genre: stmt.read(4)?,
 
         });
     }
@@ -201,6 +229,7 @@ pub fn get_filterd(is_song: bool, filter: &tui_service::Filters) ->Result<Vec<St
     
     let filter_str = match filter{
         tui_service::Filters::Author(_e) => "author",
+        tui_service::Filters::Genre(_e) => "genre",
         tui_service::Filters::ShowAll => panic!("
             filter can not be default use _get_filterd_specified"),
 
@@ -226,6 +255,7 @@ pub fn get_filterd_specified(is_song: bool,filter: &tui_service::Filters) -> Res
     };
     let (filter_str,specificied) = match filter{
         tui_service::Filters::Author(name) => ("author",name.as_str()),
+        tui_service::Filters::Genre(name) => ("genre",name.as_str()),
         tui_service::Filters::ShowAll => ("1", "1"),
     };
     
@@ -461,10 +491,12 @@ pub fn is_playlist_unique(playlist_name: &str) -> Result<bool,anyhow::Error>{
 }
 pub fn add_playlist(playlist: Playlist) -> Result<(), anyhow::Error>{
     let db = get_connection()?;
-    let mut stmt = db.prepare("INSERT INTO playlist (list_name,is_user_created,author) 
-        VALUES (:list_name, :is_user_created, :author);")?;
+    let mut stmt = db.prepare("INSERT INTO playlist 
+        (list_name,is_user_created,author, genre) 
+        VALUES (:list_name, :is_user_created, :author , :genre);")?;
     stmt.bind((":author",playlist.author.as_str()))?; 
     stmt.bind((":list_name",playlist.list_name.as_str()))?;
+    stmt.bind((":genre",playlist.genre.as_str()))?;
     if playlist.is_user_created{
         stmt.bind((":is_user_created","1"))?;
     }else{
@@ -485,6 +517,7 @@ pub fn get_all_playlist() -> Result<Vec<Playlist>, anyhow::Error>{
             list_id :stmt.read(0).expect("Error"),
             list_name : stmt.read(1).expect("error"),
             author: stmt.read(3).expect("Error"),
+            genre: stmt.read(4)?,
             ..Default::default()
         };
         v.push(playlist);
@@ -513,6 +546,7 @@ pub fn get_playlist_by_name(list_name :&str) -> Result<Playlist,anyhow::Error>{
                     Err(_e) => {eprintln!("author not found"); String::default() }
 
                 },
+                genre: stmt.read(4).expect("can not extract genre"),
                 ..Default::default() 
             };
             Ok(playlist)
@@ -538,7 +572,7 @@ pub fn get_playlist_by_id(id: i64) -> Result<Playlist,anyhow::Error>{
     list_name : stmt.read(1)?,
     is_user_created: byte == 1,
     author: stmt.read(3).expect("Error"),
-
+    genre: stmt.read(4).expect("Error here"),
     ..Default::default()
     })
 
@@ -558,6 +592,8 @@ pub fn get_user_created_playlist() -> Result<Vec<Playlist>,anyhow::Error>{
             list_id : stmt.read(0)?,
             list_name : stmt.read(1)?,
             is_user_created: true,
+            author: stmt.read(3)?,
+            genre: stmt.read(4)?,
             ..Default::default()
         });
     }

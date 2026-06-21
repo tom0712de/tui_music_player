@@ -30,7 +30,7 @@ match file_service::update_songs(&musik_path){
 
 };
 let mut app = tui_service::App::new(
-        tui_service::Parent::specific_attribute(tui_service::Filters::ShowAll,false)).unwrap();
+        tui_service::Parent::specific_attribute(tui_service::Filters::ShowAll,false)).expect("Error");
 //let sound = sound_service::new();
 //sound.add_song_to_queue(db::service::get_song_info())
 match app.run(&mut ratatui::DefaultTerminal::new(CrosstermBackend::new(stdout())).unwrap()){
