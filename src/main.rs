@@ -16,12 +16,6 @@ fn main() {
 // load config
 let cfg: Config::Config = confy::load("Rusty-Music",None).expect("failed to load config");
 
-let _file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .append(true)
-        .open("/home/tom/programmieren/Music/log.txt")
-        .unwrap();
 
 
 //let musik_path = Path::new("/home/tom/Musik");//debug

@@ -59,7 +59,14 @@ pub fn init() -> Result<(), anyhow::Error>{
     playlist_id INTEGER NOT NULL,
     playlist_pos INTEGER);";
 
-   songs.execute(query).expect("can not create junction");
+    songs.execute(query).expect("can not create junction");
+    // stores all deleted automaticly created playlists so that the programm doesnt restore them at
+    // start up
+    let query ="CREATE TABLE IF NOT EXISTS blacklist(
+        list_name TEXT NOT NULL
+        );";
+    
+    songs.execute(query)?;
     Ok(())    
     }
     
@@ -92,7 +99,29 @@ pub fn update_song(song: &Song) -> Result<(), anyhow::Error>{
 
 }
 pub fn update_playlist(playlist: &Playlist) -> Result<(),anyhow::Error>{
+    
     let db = get_connection()?;
+    dbg!(playlist.is_user_created);
+    if playlist.is_user_created == false{
+        dbg!("playlist is not user created");
+        let mut stmt = db.prepare("
+                SELECT list_name 
+                FROM playlist 
+                WHERE list_id = :list_id
+
+            ;")?;
+        stmt.bind((":list_id",playlist.list_id))?;
+        if stmt.next()? != State::Row{
+           anyhow::bail!("could not figure the original auto generated name from the playlist cant save changes");
+
+        }
+        let auto_name : String = stmt.read(0)?;
+        let mut stmt = db.prepare("INSERT INTO blacklist
+            (list_name) VALUES (:name);")?;
+        stmt.bind((":name",auto_name.as_str()))?;
+        stmt.next()?;
+    }
+
     let mut stmt = db.prepare("
         UPDATE playlist
         SET list_name = :list_name,
@@ -412,9 +441,21 @@ pub fn get_song_count() -> Result<i64, anyhow::Error>{
     Ok(stmt.read(0).unwrap())
 
 }
+
+pub fn is_playlist_blacklisted(playlist_name :&str)-> Result<bool,anyhow::Error>{
+     let db = get_connection()?;
+
+    let mut stmt = db.prepare("SELECT * FROM blacklist WHERE list_name = :name ;")?;
+    stmt.bind((":name",playlist_name));
+    Ok(State::Row != stmt.next()?)
+   
+
+}
 pub fn is_playlist_unique(playlist_name: &str) -> Result<bool,anyhow::Error>{
+
     let db = get_connection()?;
-    let mut stmt = db.prepare("SELECT * FROM playlist WHERE list_name= :list_name ;").expect("failed_is_playlist_unnique");
+    let mut stmt = db.prepare("SELECT * FROM playlist WHERE list_name= :list_name ;")
+        .expect("failed_is_playlist_unnique");
     stmt.bind((":list_name",playlist_name)).expect("");
     Ok(State::Row !=  stmt.next().expect(""))
 }
@@ -495,7 +536,7 @@ pub fn get_playlist_by_id(id: i64) -> Result<Playlist,anyhow::Error>{
     return Ok(Playlist{
     list_id : stmt.read(0)?,
     list_name : stmt.read(1)?,
-    is_user_created: byte == 0,
+    is_user_created: byte == 1,
     author: stmt.read(3).expect("Error"),
 
     ..Default::default()
@@ -528,9 +569,15 @@ pub fn remove_playlist(name: &str) -> Result<(),anyhow::Error>{
         DELETE FROM playlist
         WHERE list_name = :list_name ; "
     )?;
+
     stmt.bind((":list_name",name))?;
     stmt.next()?;
-
+    // check if auto generated and then blacklist
+    //
+    let mut stmt = db.prepare("INSERT INTO blacklist
+        (list_name) VALUES (:name);")?;
+    stmt.bind((":name",name))?;
+    stmt.next()?;
     Ok(())
 
 }
