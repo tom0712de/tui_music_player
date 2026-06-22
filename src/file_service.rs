@@ -82,13 +82,22 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
             };
             if db_service::is_path_unique(&song.path)?{
                 // read id3v24 tag
-                let tag = Tag::read_from_path(&song.path).expect("Error whuíle readibg tag");
-                if let Some(artist) = tag.artist(){
-                    song.author = String::from(artist);
-                }
-                if let Some(genre) = tag.genre(){
-                    eprintln!("found genre");
-                    song.genre = String::from(genre);
+                match Tag::read_from_path(&song.path){
+                    Ok(tag) => {
+                    
+                        if let Some(artist) = tag.artist(){
+                            song.author = String::from(artist);
+                        }
+                        if let Some(genre) = tag.genre(){
+                            eprintln!("found genre");
+                            song.genre = String::from(genre);
+                        }
+                    },
+                    Err(e) => {
+                        dbg!(&song.path,e);
+                        
+                     
+                    }
                 }
                 db_service::add_song(&song)?;
             }
