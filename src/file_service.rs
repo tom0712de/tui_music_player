@@ -1,5 +1,6 @@
 use::std::fs;
 use::std::path::Path;
+use::id3::{Tag, TagLike};
 pub use crate::db_service;
 
 // get Files from Folder and add new music to db
@@ -36,9 +37,14 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
             //let list_id = playlist.list_id.clone();
             let playlist_name = playlist.list_name.clone();
             let songs_in_playlist = update_songs(&p_path).expect("Error trying to extract_songs");
+            let song = db_service::get_song_info(&songs_in_playlist[0])?;
+            playlist.author= song.author;
+            playlist.genre = song.genre;
+
             if songs_in_playlist.len() > 0 && db_service::is_playlist_blacklisted(&playlist_name)?{
                   
                 if db_service::is_playlist_unique(&playlist.list_name)?{
+
                     db_service::add_playlist(playlist)?;
                 }
 
@@ -65,7 +71,7 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
 
 
             //todo!("implement id3 metadata reader");
-            let song = db_service::Song{
+            let mut song = db_service::Song{
                 song_id: 0,
                 song_name: song_name.to_string(),
                 path: song_path,
@@ -75,6 +81,15 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
                 ..Default::default()
             };
             if db_service::is_path_unique(&song.path)?{
+                // read id3v24 tag
+                let tag = Tag::read_from_path(&song.path).expect("Error whuíle readibg tag");
+                if let Some(artist) = tag.artist(){
+                    song.author = String::from(artist);
+                }
+                if let Some(genre) = tag.genre(){
+                    eprintln!("found genre");
+                    song.genre = String::from(genre);
+                }
                 db_service::add_song(&song)?;
             }
             let re_song = db_service::get_song_by_path(&song.path).expect("Found_error");

@@ -42,6 +42,7 @@ pub fn parse_stmt_to_song(mut stmt: sqlite::Statement) -> Result<Song,anyhow::Er
             author: stmt.read(3).expect("4"),
             year: stmt.read(5).expect("44"),
             ..Default::default()
+
         };
         Ok(song)
 
@@ -141,14 +142,16 @@ pub fn add_song(song:&Song) -> Result<(), anyhow::Error>{ //needs sql injec proo
 }
 pub fn update_song(song: &Song) -> Result<(), anyhow::Error>{
     let db = get_connection()?;
-    todo!("impelemnt proper update");
     let mut stmt = db.prepare("
         UPDATE songs
-        SET Song_name = :song_name
-
+        SET Song_name = :song_name,
+        author = :song_author,
+        genre = :genre 
         WHERE song_id = :song_id ;
         ")?;
     stmt.bind((":song_name",song.song_name.as_str()))?;
+    stmt.bind((":author",song.author.as_str()))?;
+    stmt.bind((":genre",song.genre.as_str()))?;
     stmt.bind((":song_id",song.song_id))?;
     stmt.next()?;
     Ok(())

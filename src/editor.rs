@@ -112,6 +112,8 @@ impl  Editor{
             EditorType::Song(id) => {
                 let mut song = db_service::get_song_info(&id)?;
                 song.song_name = self.items[0].1.clone();
+                song.genre = self.items[1].1.clone();
+                song.author = self.items[2].1.clone();
                 db_service::update_song(&song)?;
                 Ok(())
                 
