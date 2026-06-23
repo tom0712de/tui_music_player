@@ -71,14 +71,13 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
             }
 
 
-            //todo!("implement id3 metadata reader");
             let mut song = db_service::Song{
                 song_id: 0,
                 song_name: song_name.to_string(),
                 path: song_path,
                 author: String::from("not specified"),
                 genre: String::from("not specified"),
-                year: 2,
+                year: 0,
                 ..Default::default()
             };
             if db_service::is_path_unique(&song.path)?{
@@ -93,6 +92,10 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
                             eprintln!("found genre");
                             song.genre = String::from(genre);
                         }
+                        if let Some(year) = tag.year(){
+                            song.year = i64::from(year);
+                        }
+                        
                     },
                     Err(e) => {
                         dbg!(&song.path,e);
@@ -111,12 +114,6 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
         }
     }
     Ok(songs)
-
-
-    
-}
-pub fn extract_songs(){
-    
 }
 
 

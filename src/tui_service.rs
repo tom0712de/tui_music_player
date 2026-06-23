@@ -1,5 +1,6 @@
 use::anyhow::anyhow;
 pub use crate::db_service;
+
 use std::io::stdout;
 pub use crate::editor;
 use::ratatui::{DefaultTerminal, Frame};
@@ -10,7 +11,7 @@ use ratatui::style::{Style, Stylize};
 
 use ratatui::backend::CrosstermBackend;
 pub use crate::sound_service::{SoundControlls};
-
+pub use crate::Config;
 pub use crate::sound_service;
 pub struct App {
     pub is_exit: bool, // Kontrolliert ob die App weiter laufen soll -> Wenn false: App schließt
@@ -280,29 +281,39 @@ impl App {
              
         }
         else {
+
+                let cfg: Config::Config = confy::load("Rusty-Music",None).expect("failed to load config");
                 match key_event.code{
-                    KeyCode::Char('D') => self.delete_current()?,
-                    KeyCode::Char('a') => self.playlist_adder()?,
-                    KeyCode::Char('q') => self.q_pressed().expect(""),
-                    KeyCode::Char('j') => self.song_list.table_state.select_next(),
-                    KeyCode::Char('k') => self.song_list.table_state.select_previous(),
-                    KeyCode::Char('e') => self.e_pressed().expect(""),
-                    KeyCode::Char(' ') => self.player_controller.controll(SoundControlls::PlayPause).expect(""),
-                    KeyCode::Char('J') => self.move_song(1)?,
-                    KeyCode::Char('K') => self.move_song(-1)?,
-                    KeyCode::Enter => self.enter_pressed().expect(""),
-                    KeyCode::Char('l') => self.player_controller.controll(SoundControlls::SkipSong).expect(""),
-                    KeyCode::Char('i') => match self.i_pressed(){
-                        _ => (),
+                    KeyCode::Char(val) => {
+                        match val {
+                            val if val == cfg.delete => self.delete_current()?,
+                            val if val == cfg.exit => self.q_pressed().expect(""),
+                            val if val == cfg.down => self.song_list.table_state.select_next(),
+                            val if val == cfg.up => self.song_list.table_state.select_previous(),
+                            val if val == cfg.select => self.e_pressed().expect(""),
+                            val if val == cfg.play_pause => self.player_controller.controll(SoundControlls::PlayPause).expect(""),
+                            val if val == cfg.move_down => self.move_song(1)?,
+                            val if val == cfg.move_up => self.move_song(-1)?,
+                            val if val == cfg.skip => self.player_controller.controll(SoundControlls::SkipSong).expect(""),
+                            val if val == cfg.edit => match self.i_pressed(){
+                                _ =>(),
+                                }
+                            val if val == cfg.add => self.playlist_adder()?,
+                            val if val == cfg.down => self.song_list.table_state.select_next(),
+                            val if val == cfg.create =>  self.create_playlist()?,
+                            val if val == cfg.filter_forward => self.switch_filter(1)?,
+                            val if val == cfg.filter_back => self.switch_filter(-1)?,
+                            _ => eprintln!("Error"),
+
+                        };
                     },
-                    KeyCode::Char('c') =>  self.create_playlist()?,
-                    KeyCode::Char('L') => self.switch_filter(1)?,
-                    KeyCode::Char('H') => self.switch_filter(-1)?,
-                    _ => eprintln!("Error"),
-                }
+                    KeyCode::Enter => self.enter_pressed().expect(""),
+                      _ => (),
+                };
             }
+            
         Ok(())
-    
+   
     }
     pub fn switch_filter(&mut self, direction: i64) -> Result<(),anyhow::Error>{
         if direction > 0{

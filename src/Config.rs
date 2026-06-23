@@ -15,10 +15,10 @@ pub struct Config {
     pub move_down: char,  // 'J'
     pub move_up: char,    // 'K'
     pub skip: char,       // 'l'
-    pub info: char,       // 'i'
     pub create: char,     // 'c
-
-
+    pub select: char,    
+    pub filter_forward: char,
+    pub filter_back: char,
 }
 
 impl ::std::default::Default for Config {
@@ -31,13 +31,16 @@ impl ::std::default::Default for Config {
             add: 'a',
             down: 'j',
             up: 'k',
-            edit: 'e',
+            edit: 'i',
             play_pause: ' ',
             move_down: 'J',
             move_up: 'K',
             skip: 'l',
-            info: 'i',
             create: 'c',
+            select: 'e',
+            filter_forward: 'L',
+            filter_back: 'H',
+
         }
     }
 }

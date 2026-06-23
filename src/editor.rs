@@ -32,7 +32,8 @@ impl  Editor{
                 let song = db_service::get_song_info(&p_song_id)?;
                 let items = vec![(String::from("name"),song.song_name),
                     (String::from("genre"),song.genre),
-                    (String::from("author"),song.author)];
+                    (String::from("author"),song.author),
+                    (String::from("date"),format!("{}",song.year))];
                 eprintln!("{:?}",items);
                 
                 return Ok(Self{
@@ -172,11 +173,11 @@ impl  Editor{
         match self.editor_type{
             EditorType::AddToPlaylist(song_id) =>{
                 match key{
-                    KeyCode::Char(',') => {
+                    KeyCode::Enter=> {
                         self.save_to_playlist(song_id)?;
                     }
-                    KeyCode::Down => self.table_state.select_next(),
-                    KeyCode::Up => self.table_state.select_previous(),
+                    KeyCode::Char('j')=> self.table_state.select_next(),
+                    KeyCode::Char('k')=> self.table_state.select_previous(),
 
 
                     _ => (),
