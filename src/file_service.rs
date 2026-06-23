@@ -38,13 +38,13 @@ pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
             //let list_id = playlist.list_id.clone();
             let playlist_name = playlist.list_name.clone();
             let songs_in_playlist = update_songs(&p_path).expect("Error trying to extract_songs");
-            let song = db_service::get_song_info(&songs_in_playlist[0])?;
-            playlist.author= song.author;
-            playlist.genre = song.genre;
-
-            if songs_in_playlist.len() > 0 && db_service::is_playlist_blacklisted(&playlist_name)?{
+                        if songs_in_playlist.len() > 0 && db_service::is_playlist_blacklisted(&playlist_name)?{
                   
                 if db_service::is_playlist_unique(&playlist.list_name)?{
+                    let song = db_service::get_song_info(&songs_in_playlist[0])?;
+                    playlist.author= song.author;
+                    playlist.genre = song.genre;
+
 
                     db_service::add_playlist(playlist)?;
                 }
