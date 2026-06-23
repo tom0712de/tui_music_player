@@ -296,31 +296,53 @@ impl App {
                         _ => (),
                     },
                     KeyCode::Char('c') =>  self.create_playlist()?,
-                    KeyCode::Char('L') => self.switch_filter()?,
-
+                    KeyCode::Char('L') => self.switch_filter(1)?,
+                    KeyCode::Char('H') => self.switch_filter(-1)?,
                     _ => eprintln!("Error"),
                 }
             }
         Ok(())
     
     }
-    pub fn switch_filter(&mut self) -> Result<(),anyhow::Error>{
-        self.song_list = Song_List::new(match &self.song_list.parent{
-            Parent::Filter(filter,is_song) => match filter{ 
-                Filters::ShowAll => Parent::Filter(Filters::Author(String::default()),*is_song),
-                Filters::Author(_name) => Parent::Filter(Filters::Genre(String::default()),*is_song),
-                Filters::Genre(_name) => Parent::specific_attribute(Filters::ShowAll,*is_song),
-                
-            }
-            Parent::specific_attribute(filter, is_song) => match filter{
+    pub fn switch_filter(&mut self, direction: i64) -> Result<(),anyhow::Error>{
+        if direction > 0{
+            self.song_list = Song_List::new(match &self.song_list.parent{
+                Parent::Filter(filter,is_song) => match filter{ 
+                    Filters::ShowAll => Parent::Filter(Filters::Author(String::default()),*is_song),
+                    Filters::Author(_name) => Parent::Filter(Filters::Genre(String::default()),*is_song),
+                    Filters::Genre(_name) => Parent::specific_attribute(Filters::ShowAll,*is_song),
+                    
+                }
+                Parent::specific_attribute(filter, is_song) => match filter{
 
-                Filters::ShowAll => Parent::Filter(Filters::Author(String::default()),*is_song),
+                    Filters::ShowAll => Parent::Filter(Filters::Author(String::default()),*is_song),
 
-                _ => Parent::specific_attribute(Filters::ShowAll,*is_song)
-            }
-            _ => Parent::specific_attribute(Filters::ShowAll,false),
+                    _ => Parent::specific_attribute(Filters::ShowAll,*is_song)
+                }
+                _ => Parent::specific_attribute(Filters::ShowAll,false),
 
-        })?;
+            })?;
+        }else{
+            self.song_list = Song_List::new(match &self.song_list.parent{
+                Parent::Filter(filter,is_song) => match filter{ 
+                    Filters::ShowAll => Parent::Filter(Filters::Author(String::default()),*is_song),
+                    Filters::Genre(_name) => Parent::Filter(Filters::Author(String::default()),*is_song),
+                    Filters::Author(_name) => Parent::specific_attribute(Filters::ShowAll,*is_song),
+                    
+                }
+                Parent::specific_attribute(filter, is_song) => match filter{
+
+                    Filters::ShowAll => Parent::Filter(Filters::Genre(String::default()),*is_song),
+
+                    _ => Parent::specific_attribute(Filters::ShowAll,*is_song)
+                }
+                _ => Parent::specific_attribute(Filters::ShowAll,false),
+
+            })?;
+
+
+
+        }
         Ok(())
 
 
@@ -515,10 +537,14 @@ impl App {
             Parent::default =>{
                 self.is_exit = true;
             },
+            Parent::Filter(..) => {
+                self.is_exit = true;
+            },
             Parent::specific_attribute(filters,_is_song) => {
                 match filters.clone() {
                     Filters::ShowAll => self.is_exit = true,
                     Filters::Author(..) => self.song_list = Song_List::new(Parent::Filter(Filters::Author(String::default()),false))?,
+                    Filters::Genre(..) => self.song_list = Song_List::new(Parent::Filter(Filters::Genre(String::default()),false))?,
                     _ => self.song_list = Song_List::new(Parent::specific_attribute(Filters::ShowAll,false))?,
 
 

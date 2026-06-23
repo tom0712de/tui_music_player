@@ -9,6 +9,7 @@ pub use crate::db_service;
 pub fn update_songs(p_movie_path: &Path) ->Result<Vec<i64> ,anyhow::Error> {
     let mut songs = Vec::new();
     let movie_path = p_movie_path;
+
     for entry in match fs::read_dir(movie_path){
         Ok(t) => t,
         Err(_e) => panic!("cant acces Path"),
