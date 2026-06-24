@@ -19,19 +19,18 @@ pub struct App {
     pub player_controller: sound_service::PlayerController, //abstraction Layer to controll the
     pub editor: editor::Editor,                                //audio playback
     pub show_edit: bool,
-    pub show_selected_mode: bool,
     pub terminal: DefaultTerminal,
 }
 impl App {
     pub fn new(p_parent: Parent) -> Result<Self,anyhow::Error>{
       Ok(Self{
-        is_exit : false,
-        song_list : Song_List::new(p_parent)?, 
-        player_controller: sound_service::PlayerController::new(),
-        editor : editor::Editor::new(editor::EditorType::Default)?,
-        show_edit: false,
 
-        show_selected_mode: false, 
+        is_exit : false, //exists the program if true
+        song_list : Song_List::new(p_parent)?,  // list of all itmes currently dispalayed
+        player_controller: sound_service::PlayerController::new(), //to controll the sound playback
+        editor : editor::Editor::new(editor::EditorType::Default)?, //holds information about pop
+                                                                    //widget 
+        show_edit: false, //if true shows pop up
         terminal: (ratatui::DefaultTerminal::new(CrosstermBackend::new(stdout())).unwrap()),
 
       })
@@ -65,15 +64,11 @@ impl App {
                 }
             }
         }
+        //---- terminal cleanup
         crossterm::terminal::disable_raw_mode()?;
         terminal.clear()?;
 
-        
-        //---
-        
-        //--- Terminal cleanup
         Ok(())
-        //---
     }
 
 
@@ -277,7 +272,6 @@ impl App {
         
                 }
 
-        }else if self.show_selected_mode{
              
         }
         else {

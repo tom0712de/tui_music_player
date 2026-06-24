@@ -425,7 +425,6 @@ pub fn is_song_in_playlist(song_id: &i64, list_id:&i64) -> Result<bool,anyhow::E
 }
 
 pub fn get_song_info(index:&i64) -> Result<Song, anyhow::Error> {
-    dbg!(index);
     let db = get_connection()?;
     let mut stmt = db.prepare("SELECT * FROM songs
         WHERE song_id = :song_id; ")?;
